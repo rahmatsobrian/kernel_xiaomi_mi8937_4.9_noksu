@@ -29,7 +29,7 @@ IR=arch/arm64/configs/vendor/feature/ir.config
 MERGE="$ROOTDIR/scripts/kconfig/merge_config.sh"
 
 # ========== TOOLCHAIN (CLANG) ===========
-export PATH="$ROOTDIR/clang-zyc/bin:$PATH"
+export PATH="$ROOTDIR/azure-clang/bin:$PATH"
 
 # ================= INFO =================
 KERNEL_NAME="ReLIFE"
@@ -62,9 +62,9 @@ clone_anykernel() {
 
 get_toolchain_info() {
     if command -v clang >/dev/null 2>&1; then
-        if clang --version | grep -qi "zyc\|zycromerz"; then
+        if clang --version | grep -qi "azure\|azure"; then
             CLANG_VER=$(clang --version | head -n1 | sed 's/.*version //')
-            TC_INFO="ZYC Clang ${CLANG_VER}"
+            TC_INFO="Azure Clang ${CLANG_VER}"
         else
             CLANG_VER=$(clang --version | head -n1)
             TC_INFO="Clang (${CLANG_VER})"
