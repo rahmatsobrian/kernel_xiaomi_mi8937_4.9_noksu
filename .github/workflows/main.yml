@@ -35,12 +35,8 @@ jobs:
 
       - name: Setup ZYC Clang
         run: |
-          mkdir -p clang-zyc
-          cd clang-zyc
-
-            wget -q $(curl -k https://raw.githubusercontent.com/ZyCromerZ/Clang/main/Clang-16-link.txt) -O zyc-clang.tar.gz
-            tar -xf zyc-clang.tar.gz
-            rm -f zyc-clang.tar.gz
+          git clone https://gitlab.com/Panchajanya1999/azure-clang.git azure-clang
+          cd azure-clang
 
       - name: Start Build (with log)
         run: |
