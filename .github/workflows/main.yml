@@ -37,6 +37,12 @@ jobs:
         run: |
           git clone https://gitlab.com/Panchajanya1999/azure-clang.git azure-clang
           cd azure-clang
+      - name: Setup Linker Fix
+        run: |
+          echo "Forcing system linker"
+          export LD=ld.lld
+          export HOSTLD=ld.lld
+          ld.lld --version
 
       - name: Start Build (with log)
         run: |
