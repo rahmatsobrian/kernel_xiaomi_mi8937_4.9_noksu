@@ -35,14 +35,12 @@ jobs:
 
       - name: Setup ZYC Clang
         run: |
-          git clone https://gitlab.com/Panchajanya1999/azure-clang.git azure-clang
-          cd azure-clang
-      - name: Setup Linker Fix
-        run: |
-          echo "Forcing system linker"
-          export LD=ld.lld
-          export HOSTLD=ld.lld
-          ld.lld --version
+          mkdir -p clang-zyc
+          cd clang-zyc
+
+            wget -q $(curl -k https://raw.githubusercontent.com/ZyCromerZ/Clang/main/Clang-15-link.txt) -O zyc-clang.tar.gz
+            tar -xf zyc-clang.tar.gz
+            rm -f zyc-clang.tar.gz
 
       - name: Start Build (with log)
         run: |
