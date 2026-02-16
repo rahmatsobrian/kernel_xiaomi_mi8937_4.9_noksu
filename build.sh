@@ -7,7 +7,7 @@ yellow='\033[0;33m'
 white='\033[0m'
 
 # ================= PATH =================
-DEFCONFIG=/vendor/msm8937-perf_defconfig
+DEFCONFIG=vendor/msm8937-perf_defconfig
 ROOTDIR=$(pwd)
 OUTDIR="$ROOTDIR/out/arch/arm64/boot"
 ANYKERNEL_DIR="$ROOTDIR/AnyKernel"
