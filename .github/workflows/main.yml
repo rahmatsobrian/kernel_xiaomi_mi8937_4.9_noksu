@@ -1,0 +1,76 @@
+name: Kernel Build test
+
+on:
+  workflow_dispatch:
+  watch:
+    types: [started]
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  buildtest:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Set Swap Space
+        uses: pierotofy/set-swap-space@master
+        with:
+          swap-size-gb: 10
+
+      - name: Install Packages
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y \
+            dialog bash sed wget git curl zip tar jq expect make cmake automake autoconf \
+            llvm lld lldb clang gcc binutils bison perl gperf gawk flex bc python3 zstd \
+            openssl unzip cpio build-essential ccache liblz4-tool libsdl1.2-dev libstdc++6 \
+            libxml2 libxml2-utils lzop pngcrush schedtool squashfs-tools xsltproc zlib1g-dev \
+            libncurses5-dev bzip2 gcc-aarch64-linux-gnu gcc-arm-linux-gnueabihf \
+            gcc-arm-linux-gnueabi dos2unix kmod
+
+      - name: Setup ZYC Clang
+        run: |
+          mkdir -p clang-zyc
+          cd clang-zyc
+
+            wget -q $(curl -k https://raw.githubusercontent.com/ZyCromerZ/Clang/main/Clang-16-link.txt) -O zyc-clang.tar.gz
+            tar -xf zyc-clang.tar.gz
+            rm -f zyc-clang.tar.gz
+
+      - name: Start Build (with log)
+        run: |
+          mkdir -p logs
+          bash build.sh 2>&1 | tee logs/build.txt
+
+      - name: Upload Build Log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: logs/build.txt
+
+      - name: Upload AnyKernel Zip
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: anykernel-zip
+          path: AnyKernel/*.zip
+
+      - name: Upload Kernel Image
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: image-gz
+          path: out/arch/arm64/boot/Image.gz
+
+      - name: Upload DTB
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: image-gz-dtb
+          path: out/arch/arm64/boot/Image.gz-dtb
