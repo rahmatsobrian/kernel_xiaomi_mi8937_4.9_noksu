@@ -144,6 +144,12 @@ make O=out ARCH=arm64 ${DEFCONFIG} || {
     exit 1
 }
 
+echo -e "$yellow[+] Finalizing kernel config...$white"
+make O=out ARCH=arm64 olddefconfig || {
+    send_telegram_error
+    exit 1
+}
+
 echo -e "$yellow[+] Check root directory...$white"
 ls -a
 
