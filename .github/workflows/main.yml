@@ -1,4 +1,4 @@
-name: Kernel Build test
+name: Build test
 
 on:
   workflow_dispatch:
@@ -20,7 +20,7 @@ jobs:
       - name: Set Swap Space
         uses: pierotofy/set-swap-space@master
         with:
-          swap-size-gb: 10
+          swap-size-gb: 5
 
       - name: Install Packages
         run: |
@@ -33,26 +33,17 @@ jobs:
             libncurses5-dev bzip2 gcc-aarch64-linux-gnu gcc-arm-linux-gnueabihf \
             gcc-arm-linux-gnueabi dos2unix kmod
 
-      - name: Setup ZYC Clang
-        run: |
-          mkdir -p clang-zyc
-          cd clang-zyc
-
-            wget -q $(curl -k https://raw.githubusercontent.com/ZyCromerZ/Clang/main/Clang-15-link.txt) -O zyc-clang.tar.gz
-            tar -xf zyc-clang.tar.gz
-            rm -f zyc-clang.tar.gz
-
       - name: Start Build (with log)
         run: |
           mkdir -p logs
-          bash build.sh 2>&1 | tee logs/build.txt
+          bash build.sh 2>&1 | tee logs/build.log
 
       - name: Upload Build Log
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: build-log
-          path: logs/build.txt
+          path: logs/build.log
 
       - name: Upload AnyKernel Zip
         if: success()
