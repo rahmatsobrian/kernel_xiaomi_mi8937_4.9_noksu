@@ -32,7 +32,7 @@ MD5_HASH="unknown"
 ZIP_NAME=""
 # ================= FUNCTION =================
 clone_anykernel() {
-    if [ ! -d "$ANYKERNEL_DIR" ]; then
+if [ ! -d "$ANYKERNEL_DIR" ]; then
         echo -e "$yellow[+] Cloning AnyKernel3...$white"
         git clone -b mi8937 https://github.com/rahmatsobrian/AnyKernel3.git "$ANYKERNEL_DIR" || exit 1
     fi
