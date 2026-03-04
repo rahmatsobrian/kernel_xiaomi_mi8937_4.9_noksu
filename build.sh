@@ -30,20 +30,20 @@ DATE=$(TZ=Asia/Jakarta date +"%d %B %Y %H:%M WIB")
 DATE_TITLE=$(TZ=Asia/Jakarta date +"%d%m%Y-%H%M")
 
 # ================= GIT =================
-BRANCH=$(git rev-parse --abbrev-ref HEAD)
-COMMIT=$(git log --pretty=format:'%h : %s' -1)
-HASH=$(git rev-parse --short HEAD)
+BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
+COMMIT=$(git log --pretty=format:'%h : %s' -1 2>/dev/null)
+HASH=$(git rev-parse --short HEAD 2>/dev/null)
 
 # ================= SYSTEM =================
 BUILDER=$(whoami)
 HOST=$(hostname)
 CPU=$(grep "model name" /proc/cpuinfo | head -n1 | cut -d ":" -f2)
 
-# ================= FILE =================
+# ================= GLOBAL =================
 IMAGE=""
 ZIP=""
 MD5=""
-KERNEL_VERSION=""
+KERNEL_VERSION="unknown"
 ANDROID_VERSION="Unknown"
 KSU_VERSION="None"
 SUSFS_VERSION="None"
@@ -53,35 +53,31 @@ BUILD_TIME="0"
 # ================= TELEGRAM =================
 
 tg_send() {
-
-curl -s -X POST https://api.telegram.org/bot$TG_TOKEN/sendMessage \
--d chat_id=$TG_CHAT \
--d parse_mode=Markdown \
+curl -s -X POST "https://api.telegram.org/bot$TG_TOKEN/sendMessage" \
+-d chat_id="$TG_CHAT" \
+-d parse_mode="Markdown" \
 -d text="$1" > /dev/null
-
 }
 
 tg_file() {
-
-curl -s -X POST https://api.telegram.org/bot$TG_TOKEN/sendDocument \
--F chat_id=$TG_CHAT \
+curl -s -X POST "https://api.telegram.org/bot$TG_TOKEN/sendDocument" \
+-F chat_id="$TG_CHAT" \
 -F document=@"$1" \
--F caption="$2" \
--F parse_mode=Markdown > /dev/null
-
+-F parse_mode="Markdown" \
+-F caption="$2" > /dev/null
 }
 
 # ================= DETECT =================
 
 detect_android() {
 
-if grep -q "android15" arch/arm64/configs/* 2>/dev/null; then
+if grep -qi android15 arch/arm64/configs/* 2>/dev/null; then
 ANDROID_VERSION="Android 15"
-elif grep -q "android14" arch/arm64/configs/*; then
+elif grep -qi android14 arch/arm64/configs/* 2>/dev/null; then
 ANDROID_VERSION="Android 14"
-elif grep -q "android13" arch/arm64/configs/*; then
+elif grep -qi android13 arch/arm64/configs/* 2>/dev/null; then
 ANDROID_VERSION="Android 13"
-elif grep -q "android12" arch/arm64/configs/*; then
+elif grep -qi android12 arch/arm64/configs/* 2>/dev/null; then
 ANDROID_VERSION="Android 12"
 fi
 
@@ -99,9 +95,9 @@ KERNEL_VERSION="$VERSION.$PATCH.$SUBLEVEL"
 
 detect_compiler() {
 
-if command -v ${TC64}gcc >/dev/null; then
+if command -v ${TC64}gcc >/dev/null 2>&1; then
 COMPILER=$(${TC64}gcc --version | head -n1)
-elif command -v clang >/dev/null; then
+elif command -v clang >/dev/null 2>&1; then
 COMPILER=$(clang --version | head -n1)
 fi
 
@@ -110,13 +106,7 @@ fi
 detect_kernelsu() {
 
 if grep -q "CONFIG_KSU=y" out/.config 2>/dev/null; then
-
-if [ -f KernelSU/kernel/Makefile ]; then
-KSU_VERSION=$(grep VERSION KernelSU/kernel/Makefile | head -n1 | awk '{print $3}')
-else
 KSU_VERSION="Enabled"
-fi
-
 fi
 
 }
@@ -124,29 +114,8 @@ fi
 detect_susfs() {
 
 if grep -q "CONFIG_KSU_SUSFS" out/.config 2>/dev/null; then
-
-if [ -f fs/susfs/Makefile ]; then
-SUSFS_VERSION=$(grep VERSION fs/susfs/Makefile | head -n1 | awk '{print $3}')
-else
 SUSFS_VERSION="Enabled"
 fi
-
-fi
-
-}
-
-# ================= BADGE =================
-
-build_badge() {
-
-BADGE="
-██████╗ ███████╗██╗     ██╗███████╗███████╗
-██╔══██╗██╔════╝██║     ██║██╔════╝██╔════╝
-██████╔╝█████╗  ██║     ██║█████╗  █████╗
-██╔══██╗██╔══╝  ██║     ██║██╔══╝  ██╔══╝
-██║  ██║███████╗███████╗██║██║     ███████╗
-╚═╝  ╚═╝╚══════╝╚══════╝╚═╝╚═╝     ╚══════╝
-"
 
 }
 
@@ -154,7 +123,7 @@ BADGE="
 
 build_kernel() {
 
-echo -e "$yellow[+] Kernel build started$white"
+echo -e "${yellow}[+] Kernel build started${white}"
 
 rm -rf out
 
@@ -198,21 +167,24 @@ if [ -f "$OUTDIR/Image.gz-dtb" ]; then
 IMAGE="Image.gz-dtb"
 elif [ -f "$OUTDIR/Image.gz" ]; then
 IMAGE="Image.gz"
+else
+echo "Kernel image not found"
+exit 1
 fi
 
 if [ ! -d "$ANYKERNEL" ]; then
-git clone https://github.com/rahmatsobrian/AnyKernel3 $ANYKERNEL
+git clone https://github.com/rahmatsobrian/AnyKernel3 "$ANYKERNEL"
 fi
 
 cp "$OUTDIR/$IMAGE" "$ANYKERNEL/"
 
-cd $ANYKERNEL
+cd "$ANYKERNEL" || exit 1
 
 ZIP="${KERNEL_NAME}-${DEVICE}-${KERNEL_VERSION}-${DATE_TITLE}.zip"
 
-zip -r9 $ZIP * -x .git README.md
+zip -r9 "$ZIP" . -x ".git*" "README.md"
 
-MD5=$(md5sum $ZIP | awk '{print $1}')
+MD5=$(md5sum "$ZIP" | awk '{print $1}')
 
 }
 
@@ -230,14 +202,6 @@ fi
 if [ -f "$DTBOIMG" ]; then
 tg_file "$DTBOIMG" "dtbo.img"
 fi
-
-}
-
-# ================= BENCHMARK =================
-
-benchmark() {
-
-SPEED=$((THREAD*100/BUILD_TIME))
 
 }
 
@@ -279,9 +243,6 @@ $THREAD
 Build Time :
 ${BUILD_TIME}s
 
-Benchmark :
-CI Score $SPEED
-
 MD5 :
 \`$MD5\`
 
@@ -295,17 +256,18 @@ $DATE
 
 upload_log() {
 
+if [ -f "build.log" ]; then
 tg_file "build.log" "Kernel Build Log"
+fi
 
 }
 
 # ================= RUN =================
 
-build_badge
 build_kernel
 pack_kernel
 upload_extra
 send_result
 upload_log
 
-echo -e "$green[✓] Build Finished$white"
+echo -e "${green}[✓] Build Finished${white}"
