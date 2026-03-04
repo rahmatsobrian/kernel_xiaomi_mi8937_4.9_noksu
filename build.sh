@@ -38,8 +38,8 @@ TC64="aarch64-linux-gnu-"
 TC32="arm-linux-gnueabi-"
 
 # ═══════════════════════════ DEFCONFIG ═══════════════════════════════
-DEFCONFIG="rahmatmsm8937hos_defconfig"
-# DEFCONFIG="rahmatmsm8937_defconfig"   # uncomment to switch
+# DEFCONFIG="rahmatmsm8937hos_defconfig"
+DEFCONFIG="rahmatmsm8937_defconfig"   # uncomment to switch
 
 # ═══════════════════════════ KERNEL INFO ═════════════════════════════
 KERNEL_NAME="ReLIFE"
