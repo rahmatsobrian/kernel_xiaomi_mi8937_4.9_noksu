@@ -15,7 +15,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
       - name: Set Swap Space
         uses: pierotofy/set-swap-space@master
@@ -33,11 +33,16 @@ jobs:
             libncurses5-dev bzip2 gcc-aarch64-linux-gnu gcc-arm-linux-gnueabihf \
             gcc-arm-linux-gnueabi dos2unix kmod
 
-      - name: Setup KernelSU (Legacy)
+      - name: Setup KernelSU Next (Legacy)
         run: |
-         curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash -s legacy
-          
-      - name: Start Build (with log)
+          curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash -s legacy
+
+      - name: Fix Line Endings
+        run: |
+          dos2unix build.sh
+          chmod +x build.sh
+
+      - name: Start Build
         run: |
           mkdir -p logs
           bash build.sh 2>&1 | tee logs/build.log
@@ -69,3 +74,4 @@ jobs:
         with:
           name: image-gz-dtb
           path: out/arch/arm64/boot/Image.gz-dtb
+          
