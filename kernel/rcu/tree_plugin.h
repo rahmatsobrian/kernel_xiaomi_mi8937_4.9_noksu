@@ -1,4 +1,4 @@
-/*
+ /*
  * Read-Copy Update mechanism for mutual exclusion (tree-based version)
  * Internal non-public definitions that provide either classic
  * or preemptible semantics.
@@ -535,7 +535,7 @@ void rcu_read_unlock_special(struct task_struct *t)
 
 		/* Unboost if we were boosted. */
 		if (IS_ENABLED(CONFIG_RCU_BOOST) && drop_boost_mutex)
-			rt_mutex_unlock(&rnp->boost_mtx);
+			rt_mutex_futex_unlock(&rnp->boost_mtx);
 	} else {
 		local_irq_restore(flags);
 	}
