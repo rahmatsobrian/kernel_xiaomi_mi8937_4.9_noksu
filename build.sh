@@ -3,271 +3,175 @@
 # ================= COLOR =================
 red='\033[0;31m'
 green='\033[0;32m'
-yellow='\033[1;33m'
-cyan='\033[0;36m'
+yellow='\033[0;33m'
 white='\033[0m'
 
-# ================= BASIC =================
-KERNEL_NAME="ReLIFE"
-DEVICE="mi8937"
-
+# ================= PATH =================
 ROOTDIR=$(pwd)
 OUTDIR="$ROOTDIR/out/arch/arm64/boot"
-ANYKERNEL="$ROOTDIR/AnyKernel"
+ANYKERNEL_DIR="$ROOTDIR/AnyKernel"
 
-THREAD=$(nproc)
+KIMG_DTB="$OUTDIR/Image.gz-dtb"
+KIMG="$OUTDIR/Image.gz"
 
 # ================= TOOLCHAIN =================
 TC64="aarch64-linux-gnu-"
 TC32="arm-linux-gnueabi-"
 
+# ================= INFO =================
+KERNEL_NAME="ReLIFE"
+DEVICE="mi8937"
+
+# ================= DATE (WIB) =================
+DATE_TITLE=$(TZ=Asia/Jakarta date +"%d%m%Y")
+TIME_TITLE=$(TZ=Asia/Jakarta date +"%H%M%S")
+BUILD_DATETIME=$(TZ=Asia/Jakarta date +"%d %B %Y")
+
 # ================= TELEGRAM =================
-TG_TOKEN="7443002324:AAFpDcG3_9L0Jhy4v98RCBqu2pGfznBCiDM"
-TG_CHAT="-1003520316735"
-
-# ================= DATE =================
-DATE=$(TZ=Asia/Jakarta date +"%d %B %Y %H:%M WIB")
-DATE_TITLE=$(TZ=Asia/Jakarta date +"%d%m%Y-%H%M")
-
-# ================= GIT =================
-BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
-COMMIT=$(git log --pretty=format:'%h : %s' -1 2>/dev/null)
-HASH=$(git rev-parse --short HEAD 2>/dev/null)
-
-# ================= SYSTEM =================
-BUILDER=$(whoami)
-HOST=$(hostname)
-CPU=$(grep "model name" /proc/cpuinfo | head -n1 | cut -d ":" -f2)
+TG_BOT_TOKEN="7443002324:AAFpDcG3_9L0Jhy4v98RCBqu2pGfznBCiDM"
+TG_CHAT_ID="-1003520316735"
 
 # ================= GLOBAL =================
-IMAGE=""
-ZIP=""
-MD5=""
+BUILD_TIME="unknown"
 KERNEL_VERSION="unknown"
-ANDROID_VERSION="Unknown"
-KSU_VERSION="None"
-SUSFS_VERSION="None"
-COMPILER="Unknown"
-BUILD_TIME="0"
+TC_INFO="unknown"
+IMG_USED="unknown"
+MD5_HASH="unknown"
+ZIP_NAME=""
 
-# ================= TELEGRAM =================
+# ================= FUNCTION =================
 
-tg_send() {
-curl -s -X POST "https://api.telegram.org/bot$TG_TOKEN/sendMessage" \
--d chat_id="$TG_CHAT" \
--d parse_mode="Markdown" \
--d text="$1" > /dev/null
+clone_anykernel() {
+    if [ ! -d "$ANYKERNEL_DIR" ]; then
+        echo -e "$yellow[+] Cloning AnyKernel3...$white"
+        git clone -b mi8937 https://github.com/rahmatsobrian/AnyKernel3.git "$ANYKERNEL_DIR" || exit 1
+    fi
 }
 
-tg_file() {
-curl -s -X POST "https://api.telegram.org/bot$TG_TOKEN/sendDocument" \
--F chat_id="$TG_CHAT" \
--F document=@"$1" \
--F parse_mode="Markdown" \
--F caption="$2" > /dev/null
+get_toolchain_info() {
+    if command -v "${TC64}gcc" >/dev/null 2>&1; then
+        GCC_VER=$("${TC64}gcc" -dumpversion)
+        TC_INFO="GCC ${GCC_VER}"
+    elif command -v gcc >/dev/null 2>&1; then
+        GCC_VER=$(gcc -dumpversion)
+        TC_INFO="GCC ${GCC_VER}"
+    else
+        TC_INFO="unknown"
+    fi
 }
 
-# ================= DETECT =================
-
-detect_android() {
-
-if grep -qi android15 arch/arm64/configs/* 2>/dev/null; then
-ANDROID_VERSION="Android 15"
-elif grep -qi android14 arch/arm64/configs/* 2>/dev/null; then
-ANDROID_VERSION="Android 14"
-elif grep -qi android13 arch/arm64/configs/* 2>/dev/null; then
-ANDROID_VERSION="Android 13"
-elif grep -qi android12 arch/arm64/configs/* 2>/dev/null; then
-ANDROID_VERSION="Android 12"
-fi
-
+get_kernel_version() {
+    if [ -f "Makefile" ]; then
+        VERSION=$(grep -E '^VERSION =' Makefile | awk '{print $3}')
+        PATCHLEVEL=$(grep -E '^PATCHLEVEL =' Makefile | awk '{print $3}')
+        SUBLEVEL=$(grep -E '^SUBLEVEL =' Makefile | awk '{print $3}')
+        KERNEL_VERSION="${VERSION}.${PATCHLEVEL}.${SUBLEVEL}"
+    else
+        KERNEL_VERSION="unknown"
+    fi
 }
 
-detect_kernel_version() {
-
-VERSION=$(grep '^VERSION =' Makefile | awk '{print $3}')
-PATCH=$(grep '^PATCHLEVEL =' Makefile | awk '{print $3}')
-SUBLEVEL=$(grep '^SUBLEVEL =' Makefile | awk '{print $3}')
-
-KERNEL_VERSION="$VERSION.$PATCH.$SUBLEVEL"
-
+send_telegram_error() {
+    curl -s -X POST "https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage" \
+        -d chat_id="${TG_CHAT_ID}" \
+        -d parse_mode=Markdown \
+        -d text="❌ *Kernel CI Build Failed*"
 }
-
-detect_compiler() {
-
-if command -v ${TC64}gcc >/dev/null 2>&1; then
-COMPILER=$(${TC64}gcc --version | head -n1)
-elif command -v clang >/dev/null 2>&1; then
-COMPILER=$(clang --version | head -n1)
-fi
-
-}
-
-detect_kernelsu() {
-
-if grep -q "CONFIG_KSU=y" out/.config 2>/dev/null; then
-KSU_VERSION="Enabled"
-fi
-
-}
-
-detect_susfs() {
-
-if grep -q "CONFIG_KSU_SUSFS" out/.config 2>/dev/null; then
-SUSFS_VERSION="Enabled"
-fi
-
-}
-
-# ================= BUILD =================
 
 build_kernel() {
 
-echo -e "${yellow}[+] Kernel build started${white}"
+    echo -e "$yellow[+] Building kernel...$white"
 
-rm -rf out
+    rm -rf out
+    #make O=out ARCH=arm64 rahmatmsm8937_defconfig || {
+    make O=out ARCH=arm64 rahmatmsm8937hos_defconfig || {
+        send_telegram_error
+        exit 1
+    }
 
-make O=out ARCH=arm64 rahmatmsm8937hos_defconfig || exit 1
+    get_toolchain_info
+    BUILD_START=$(TZ=Asia/Jakarta date +%s)
 
-detect_android
-detect_compiler
-detect_kernel_version
+    curl -s -X POST "https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage" \
+        -d chat_id="${TG_CHAT_ID}" \
+        -d parse_mode=Markdown \
+        -d text="🚀 *Kernel CI Build Started...*"
 
-tg_send "🚀 *Kernel CI Started*
+    make -j$(nproc) O=out ARCH=arm64 \
+        CROSS_COMPILE=$TC64 \
+        CROSS_COMPILE_ARM32=$TC32 \
+        CROSS_COMPILE_COMPAT=$TC32 || {
+        send_telegram_error
+        exit 1
+    }
 
-Device : $DEVICE
-Branch : $BRANCH
-Android : $ANDROID_VERSION
-Threads : $THREAD"
+    BUILD_END=$(TZ=Asia/Jakarta date +%s)
+    DIFF=$((BUILD_END - BUILD_START))
+    BUILD_TIME="$((DIFF / 60)) min $((DIFF % 60)) sec"
 
-START=$(date +%s)
+    get_kernel_version
 
-make -j$THREAD \
-O=out \
-ARCH=arm64 \
-CROSS_COMPILE=$TC64 \
-CROSS_COMPILE_ARM32=$TC32 \
-CROSS_COMPILE_COMPAT=$TC32 \
-2>&1 | tee build.log
-
-END=$(date +%s)
-
-BUILD_TIME=$((END-START))
-
-detect_kernelsu
-detect_susfs
-
+    ZIP_NAME="${KERNEL_NAME}-${DEVICE}-${KERNEL_VERSION}-${DATE_TITLE}-${TIME_TITLE}.zip"
 }
-
-# ================= PACK =================
 
 pack_kernel() {
+    echo -e "$yellow[+] Packing AnyKernel...$white"
 
-if [ -f "$OUTDIR/Image.gz-dtb" ]; then
-IMAGE="Image.gz-dtb"
-elif [ -f "$OUTDIR/Image.gz" ]; then
-IMAGE="Image.gz"
-else
-echo "Kernel image not found"
-exit 1
-fi
+    clone_anykernel
+    cd "$ANYKERNEL_DIR" || exit 1
 
-if [ ! -d "$ANYKERNEL" ]; then
-git clone https://github.com/rahmatsobrian/AnyKernel3 "$ANYKERNEL"
-fi
+    rm -f Image* *.zip
 
-cp "$OUTDIR/$IMAGE" "$ANYKERNEL/"
+    if [ -f "$KIMG_DTB" ]; then
+        cp "$KIMG_DTB" Image.gz-dtb
+        IMG_USED="Image.gz-dtb"
+    elif [ -f "$KIMG" ]; then
+        cp "$KIMG" Image.gz
+        IMG_USED="Image.gz"
+    else
+        send_telegram_error
+        exit 1
+    fi
 
-cd "$ANYKERNEL" || exit 1
+    zip -r9 "$ZIP_NAME" . -x ".git*" "README.md"
+    MD5_HASH=$(md5sum "$ZIP_NAME" | awk '{print $1}')
 
-ZIP="${KERNEL_NAME}-${DEVICE}-${KERNEL_VERSION}-${DATE_TITLE}.zip"
-
-zip -r9 "$ZIP" . -x ".git*" "README.md"
-
-MD5=$(md5sum "$ZIP" | awk '{print $1}')
-
+    echo -e "$green[✓] Zip created: $ZIP_NAME ($IMG_USED)$white"
 }
 
-# ================= EXTRA FILE =================
+upload_telegram() {
+    ZIP_PATH="$ANYKERNEL_DIR/$ZIP_NAME"
+    [ ! -f "$ZIP_PATH" ] && return
 
-upload_extra() {
+    echo -e "$yellow[+] Uploading to Telegram...$white"
 
-BOOTIMG="$OUTDIR/../../boot.img"
-DTBOIMG="$OUTDIR/../../dtbo.img"
+    curl -s -X POST "https://api.telegram.org/bot${TG_BOT_TOKEN}/sendDocument" \
+        -F chat_id="${TG_CHAT_ID}" \
+        -F document=@"${ZIP_PATH}" \
+        -F parse_mode=Markdown \
+        -F caption="🔥 *Kernel CI Build Success*
 
-if [ -f "$BOOTIMG" ]; then
-tg_file "$BOOTIMG" "boot.img"
-fi
+📱 *Device* : ${DEVICE}
+📦 *Kernel Name* : ${KERNEL_NAME}
+🍃 *Kernel Version* : ${KERNEL_VERSION}
 
-if [ -f "$DTBOIMG" ]; then
-tg_file "$DTBOIMG" "dtbo.img"
-fi
+🛠 *Toolchain* : ${TC_INFO}
 
-}
+⌛ *Build Time* : ${BUILD_TIME}
+🕒 *Build Date* : ${BUILD_DATETIME}
 
-# ================= RESULT =================
+🔐 *MD5* :
+\`${MD5_HASH}\`
 
-send_result() {
-
-tg_file "$ANYKERNEL/$ZIP" "
-
-🔥 *ReLIFE Kernel Build Success*
-
-Device : $DEVICE
-Android : $ANDROID_VERSION
-
-Kernel :
-$KERNEL_VERSION
-
-Branch :
-$BRANCH
-
-Commit :
-\`$COMMIT\`
-
-KernelSU :
-$KSU_VERSION
-
-SUSFS :
-$SUSFS_VERSION
-
-Compiler :
-\`$COMPILER\`
-
-CPU :
-$CPU
-
-Threads :
-$THREAD
-
-Build Time :
-${BUILD_TIME}s
-
-MD5 :
-\`$MD5\`
-
-Build Date :
-$DATE
-"
-
-}
-
-# ================= LOG =================
-
-upload_log() {
-
-if [ -f "build.log" ]; then
-tg_file "build.log" "Kernel Build Log"
-fi
-
+✅ *Flash via Recovery*"
 }
 
 # ================= RUN =================
+START=$(TZ=Asia/Jakarta date +%s)
 
 build_kernel
 pack_kernel
-upload_extra
-send_result
-upload_log
+upload_telegram
 
-echo -e "${green}[✓] Build Finished${white}"
+END=$(TZ=Asia/Jakarta date +%s)
+echo -e "$green[✓] Done in $((END - START)) seconds$white"
