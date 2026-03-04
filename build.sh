@@ -83,6 +83,7 @@ build_kernel() {
     echo -e "$yellow[+] Building kernel...$white"
 
     rm -rf out
+    #make O=out ARCH=arm64 rahmatmsm8937_defconfig || {
     make O=out ARCH=arm64 rahmatmsm8937hos_defconfig || {
         send_telegram_error
         exit 1
