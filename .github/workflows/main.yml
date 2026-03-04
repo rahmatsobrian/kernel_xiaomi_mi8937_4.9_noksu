@@ -40,7 +40,9 @@ jobs:
       - name: Start Build (with log)
         run: |
           mkdir -p logs
-          bash build.sh 2>&1 | tee logs/build.log
+          dos2unix build.sh
+          chmod +x build.sh
+          ./build.sh 2>&1 | tee logs/build.log
 
       - name: Upload Build Log
         if: always()
